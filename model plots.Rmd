@@ -1,0 +1,403 @@
+---
+title: "Untitled"
+author: "Gigi Lovicu"
+date: "16/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source(paste0('/home/gigilovicu/Documents/masters/semester_1/statistics/project_submission/code/stats_project_data.R'))
+``` 
+
+## R Markdown
+
+coefficient plots - selected coefficients + other (LASSO + BMA)
+coefficient plots - with and without salary_share interaction for long models
+hhi_slope plot by team hierarchical model
+season and team intercept plots?
+
+coefficient tables - LASSO, BMS comparison and hierarchical model + quantile regression comparison (full tables in appendix)
+RMSE tables  - in-sample, out-of-sample all models
+R^2 that is appropriate for particular models
+
+model equations - LASSO, BMS, QR and hierarchical model
+
+fix theoretical R^2
+plots for BMS to check convergence
+
+```{r theme}
+our_theme <- theme_classic() +
+             theme(axis.line = element_line(color='black'),
+                          plot.background = element_blank(),
+                          plot.caption = element_text(hjust = 0),
+                          panel.grid.major = element_blank(),
+                          panel.grid.minor = element_blank(),
+                          panel.border = element_blank())
+
+```
+
+```{r clustering}
+#Plot
+plot_cluster_tot <- ggplot(cluster_averages) +
+                    geom_col(aes(y = avg_salary_share, x = salary_rank), fill = 'lightblue') +
+                    geom_errorbar(aes(ymin = sdm_salary_share, ymax = sd1_salary_share, x = salary_rank),
+                                  width = 0.5, size = 0.3) +
+                    scale_x_continuous(breaks = 1:8) +
+                    geom_point(aes(y = tot_mean, x = salary_rank), size = 2, colour = 'red') +
+                    ggtitle('Salary Shares', subtitle = 'Performance-based clustering versus player salary rank') +
+                    annotate("text", x=5, y=20, label="Cluster\n(average)", color = "red") +
+                    annotate("text", x=3, y=35, label="Within-team salary rank\n(average with error bars)*", color = "lightblue") +
+                    labs(caption = "* Error bars are +/- 1 standard deviation") +
+                    ylab("Average salary share (%)") +
+                    xlab("Salary rank/cluster") +
+                    our_theme
+
+plot_cluster_tot
+
+```
+
+```{r lasso_coefficients}
+chart_data_lasso <- season_lasso %>% data.frame() %>% mutate(variable = rownames(season_lasso)) %>% 
+                    tibble() %>% filter(estimate != 0) %>% arrange(desc(estimate))
+
+chart_lasso <- ggplot(chart_data_lasso) +
+               geom_hline(aes(yintercept=0), color = 'grey') +
+               geom_col(aes(y = estimate, x = reorder(variable, -estimate)), fill = 'lightblue') +
+               geom_errorbar(aes(ymin = ci.low, ymax = ci.up, x = variable),
+                                  width = 0.3, size = 0.3) +
+               ggtitle("Season Wins versus Player Metrics: L1 Penalisation",
+                       subtitle = "Coefficient estimates (with 95% intervals)*") +
+               labs(caption = "* Intervals calculated using post-selection inference method from in Lee et al (2016).\n***, ** and * indicate statistical significance at 1, 5 and 10% levels.") +
+               xlab("variable") +
+               ylab("coefficient") +
+               scale_x_discrete(labels= c("FG_PCT\n(P1)***", "FG_PCT\n(P2)***", "FG_PCT\n(P5)",
+                                          "FG_PCT\n(P3)***", "STL\n(P5)", 
+                                          "FG_PCT\n(P6)*", "PTS\n(P2)**", "PTS\n(P1)",
+                                          "TO\n(P6)", "TO\n(P4)***", "TO\n(P5)***")) +
+               our_theme
+
+chart_lasso
+
+```
+
+```{r bms_coefficients}
+chart_data_bayes <- season_bayes_full %>% data.frame() %>%
+                    tibble() %>% filter(margpp >= 0.9, variable != 'intercept') %>% 
+                    arrange(desc(estimate))
+
+chart_bayes <- ggplot(chart_data_bayes) +
+               geom_col(aes(y = estimate, x = reorder(variable, -estimate)), fill = 'lightblue') +
+               geom_hline(aes(yintercept=0), color = 'grey') +
+               geom_errorbar(aes(ymin = X2.5., ymax = X97.5., x = variable),
+                                  width = 0.3, size = 0.3) +
+               ggtitle("Season Wins versus Player Metrics: Bayesian Model Selection",
+                       subtitle = "Coefficient estimates (with 95% intervals)") +
+               xlab("variable") +
+               ylab("coefficient") +
+               labs(caption = "Only showing coefficients with marginal posterior inclusion probability above 90%") +
+               scale_x_discrete(labels= c("FG_PCT\n(P1)", "AST\n(P2)", "FG_PCT\n(P5)",
+                                          "BLK\n(P1)", "STL\n(P5)", "FG_PCT\n(P3)",
+                                          "PTS\n(P1)", "Salary\nHHI", "TO\n(P5)", "TO\n(P4)",
+                                          "TO\n(P2)", "TO\n(P1)")) +
+               our_theme
+
+chart_bayes
+```
+
+```{r ols_coefficients}
+chart_data_ols <- season_long_ols_coef %>%
+                 filter(!(variable %in% c("(Intercept)",
+                                          "salary_share", "salary_hhi", 
+                                          "salary_total"))) %>%
+                 arrange(variable, desc(estimate)) %>%
+                 bind_rows(season_long_ols_coef %>% filter(variable %in% c("salary_share",
+                                                              "salary_total", "salary_hhi"))) %>% 
+                 mutate(order = 1:(nrow(season_long_ols_coef)-1), color = c(rep('lightblue', 
+                                                                   nrow(season_long_ols_coef)-4),
+                                                               rep('blue', 3)))
+
+chart_ols <- ggplot(chart_data_ols) +
+            geom_col(aes(y = estimate, x = reorder(variable, order)),
+                        fill = chart_data_ols$color) +
+               geom_hline(aes(yintercept=0), color = 'grey') +
+               geom_errorbar(aes(ymin = X2.5.., ymax = X97.5.., x = variable),
+                                  width = 0.3, size = 0.3) +
+               ggtitle("Player Win Shares versus Performance Metrics: OLS",
+                       subtitle = "Coefficient estimates (with 95% intervals)") +
+               xlab("variable") +
+               ylab("coefficient") +
+               scale_y_continuous(breaks = seq(-2,2,by = 0.5)) +
+               annotate("text", x=5, y=-1,
+                        label="Performance metrics\n(with salary interactions)",
+                        color = "lightblue") +
+               annotate("text", x=21, y=1,
+                        label="Salary metrics",
+                        color = "blue") +
+               our_theme +
+               theme(axis.text=element_text(size=6,angle=90))
+  
+
+chart_ols
+```
+
+```{r qr_coefficients}
+chart_data_qr <- qr_full %>%
+                 filter(!(variable %in% c("(Intercept)",
+                                          "salary_share", "salary_hhi", 
+                                          "salary_total"))) %>%
+                 arrange(variable, desc(estimate)) %>%
+                 bind_rows(qr_full %>% filter(variable %in% c("salary_share",
+                                                              "salary_total", "salary_hhi"))) %>% 
+                 mutate(order = 1:(nrow(qr_full)-1), color = c(rep('lightblue', 
+                                                                   nrow(qr_full)-4),
+                                                               rep('blue', 3)))
+
+chart_qr <- ggplot(chart_data_qr) +
+            geom_col(aes(y = estimate, x = reorder(variable, order)),
+                        fill = chart_data_qr$color) +
+               geom_hline(aes(yintercept=0), color = 'grey') +
+               geom_errorbar(aes(ymin = X1, ymax = X2, x = variable),
+                                  width = 0.3, size = 0.3) +
+               ggtitle("Player Win Shares versus Performance Metrics: Median Regression",
+                       subtitle = "Coefficient estimates (with 95% intervals)*") +
+               xlab("variable") +
+               ylab("coefficient") +
+               scale_y_continuous(breaks = seq(-2,2,by = 0.5)) +
+               labs(caption = "*Bootstrapped confidence intervals") +
+               annotate("text", x=5, y=-1,
+                        label="Performance metrics\n(with salary interactions)",
+                        color = "lightblue") +
+               annotate("text", x=21, y=1,
+                        label="Salary metrics",
+                        color = "blue") +
+               our_theme +
+               theme(axis.text=element_text(size=6,angle=90))
+  
+
+chart_qr
+```
+
+```{r hm_coefficients}
+chart_data_hm <- season_hm_full %>%
+                 filter(!(variable %in% c("(Intercept)",
+                                          "salary_share", "salary_hhi", 
+                                          "salary_total"))) %>%
+                 arrange(variable, desc(estimate)) %>%
+                 bind_rows(season_hm_full %>% filter(variable %in% c("salary_share",
+                                                              "salary_total", "salary_hhi"))) %>% 
+                 mutate(order = 1:(nrow(season_hm_full)-1), color = c(rep('lightblue', 
+                                                                   nrow(season_hm_full)-4),
+                                                               rep('blue', 3)))
+
+chart_hm <- ggplot(chart_data_hm) +
+            geom_col(aes(y = estimate, x = reorder(variable, order)),
+                        fill = chart_data_hm$color) +
+               geom_hline(aes(yintercept=0), color = 'grey') +
+               geom_errorbar(aes(ymin = X2.5.., ymax = X97.5.., x = variable),
+                                  width = 0.3, size = 0.3) +
+               ggtitle("Player Win Shares versus Performance Metrics: Mixed Effects Model*",
+                       subtitle = "Coefficient estimates (with 95% intervals)") +
+               xlab("variable") +
+               ylab("coefficient") +
+               scale_y_continuous(breaks = seq(-2,2,by = 0.5)) +
+               labs(caption = "* Nested varying intercept model (season + team)") +
+               annotate("text", x=5, y=-1,
+                        label="Performance metrics\n(with salary interactions)",
+                        color = "lightblue") +
+               annotate("text", x=21, y=1,
+                        label="Salary metrics",
+                        color = "blue") +
+               our_theme +
+               theme(axis.text=element_text(size=6,angle=90))
+  
+
+chart_hm
+```
+```{r hm_coefficients2}
+chart_data_hm_full2 <- season_hm_slope_full %>%
+                       filter(!(variable %in% c("(Intercept)",
+                                                "salary_share", "salary_hhi", 
+                                                "salary_total"))) %>%
+                       arrange(variable, desc(estimate)) %>%
+                       bind_rows(season_hm_slope_full %>%
+                       filter(variable %in% c("salary_share","salary_total", "salary_hhi"))) %>% 
+                      mutate(order = 1:(nrow(season_hm_slope_full)-1),
+                             color = c(rep('lightblue',
+                                       nrow(season_hm_slope_full)-4),
+                                       rep('blue', 3)))
+
+chart_hm2 <- ggplot(chart_data_hm_full2) +
+            geom_col(aes(y = estimate, x = reorder(variable, order)),
+                        fill = chart_data_hm_full2$color) +
+               geom_hline(aes(yintercept=0), color = 'grey') +
+               geom_errorbar(aes(ymin = X2.5.., ymax = X97.5.., x = variable),
+                                  width = 0.3, size = 0.3) +
+               ggtitle("Player Win Shares versus Performance Metrics: Mixed Effects Model*",
+                       subtitle = "Coefficient estimates (with 95% intervals)") +
+               xlab("variable") +
+               ylab("coefficient") +
+               scale_y_continuous(breaks = seq(-2,2,by = 0.5)) +
+               labs(caption = "* Salary_hhi slope varies by team, intercept varies by season") +
+               annotate("text", x=5, y=-1,
+                        label="Performance metrics\n(with salary interactions)",
+                        color = "lightblue") +
+               annotate("text", x=21, y=1,
+                        label="Salary metrics",
+                        color = "blue") +
+               our_theme +
+               theme(axis.text=element_text(size=6,angle=90))
+  
+
+chart_hm2
+```
+
+```{r ranef}
+slope_ranef <- (season_hm_slope %>% ranef()) %>% as.data.frame() %>% 
+               filter(term == 'salary_hhi')
+
+ranef_plot <- ggplot(slope_ranef, aes(y=reorder(grp,-condval) ,x=condval)) +
+              geom_point(colour = 'red') +
+              geom_errorbarh(aes(xmin=condval -2*condsd,
+                                 xmax=condval +2*condsd), height=0, colour = 'grey') +
+              geom_vline(aes(xintercept = 0)) +
+              xlab('coefficient: slope_hhi') +
+              ylab('team') +
+              ggtitle('Random Effects: Salary Concentration by Team',
+                      subtitle = 'Conditional mode with error bars') +
+              our_theme
+
+ranef_plot
+
+```
+
+```{r ranef2}
+int_ranef <- (season_hm %>% ranef()) %>% as.data.frame()
+
+ranef_plot2 <- ggplot(int_ranef, aes(y=grp,x=condval)) +
+              geom_point() + facet_wrap(~term,scales="free_x") +
+              geom_errorbarh(aes(xmin=condval -2*condsd,
+                                 xmax=condval +2*condsd), height=0)
+
+ranef_plot2
+
+```
+
+```{r prior_elicitation}
+#Match in tibble with values of g
+r2_tibble <- tibble(g_grid, r2)
+# Plot theoretical R2
+plot_theoretical_r2 <- ggplot(r2_tibble, aes(x = g_grid, y = r2)) +
+                       geom_line() +
+                       ylab('R-squared') +
+                       xlab("Possible g values") +
+                       geom_hline(yintercept = 0.5, col = 'red', size = 0.8) +
+                       scale_y_continuous(c(0, 1)) +
+                       xlim(c(0,1)) +
+                       ggtitle(expression(paste('Theoretical ',R^2, ' (wide data)')))
+
+plot_theoretical_r2
+```
+
+
+```{r BMS_diagnostics}
+#Trace of the number of variables at each MCMC iteration.
+season_var_per_iter <- tibble(iteration = 1:nrow(season_bayes$postSample),
+                              nvars= rowSums(season_bayes$postSample))
+
+plot_vars_per_iter <- ggplot(season_var_per_iter, aes(x = iteration, y = nvars)) +
+                      geom_line() +
+                      xlab("Iteration number") +
+                      ylab("Variables included") +
+                      ggtitle("Model size", subtitle = "By iteration, MCMC with Gibbs Sampling")
+  
+#Log posterior model probabilities
+season_log_post_prob_iter <- tibble(iteration = 1:length(season_bayes$postProb),
+                                    prob = season_bayes$postProb)
+
+plot_postprob_iter <- ggplot(season_log_post_prob_iter, aes(x = iteration, y = prob)) +
+                      geom_line() +
+                      xlab("Iteration number") +
+                      ggtitle("Log Posterior Model Probability", subtitle = "By iteration, MCMC with Gibbs Sampling")
+
+#Marginal posterior inclusion probabilities
+prob_var_inc <-  matrix(NA, nrow= nrow(season_bayes$postSample), ncol = ncol(season_bayes$postSample))
+for(j in 1:(ncol(season_bayes$postSample))) {
+  prob_var_inc[, j]= cumsum(season_bayes$postSample[, j])/(1:nrow(season_bayes$postSample))
+}
+
+#Inclusion probabilities at last iteration
+coef_final_iter <- tibble(variable = names(coef(season_bayes)[-c(1,nrow(coef(season_bayes))),'margpp']),
+                          coefficient = coef(season_bayes)[-c(1,nrow(coef(season_bayes))),'margpp'])
+
+coef_high_prob <- coef_final_iter %>% mutate(color = if_else(coefficient >= 0.9, 'red', 'grey'))
+
+prob_var_inc <- tibble(iter = 1:nrow(season_bayes$postSample), prob_var_inc %>% data.frame() %>%
+                       `colnames<-`(coef_high_prob$variable)) %>% 
+                pivot_longer(-iter, names_to = "variable") %>% arrange(variable) %>%
+                left_join(coef_high_prob %>% dplyr::select(variable, color), by = 'variable')
+
+plot_prob_var_iter <- ggplot(prob_var_inc, aes(x = iter, y = value, group = variable)) +
+                      geom_line(color = prob_var_inc$color) +
+                      xlab('Iteration') +
+                      ylab("probability") +
+                      ggtitle("Posterior Marginal Inclusion Probability", subtitle = "By Iteration, MCMC with Gibbs Sampling\n(each line is a variable)")
+
+plot_coef_final_iter <- ggplot(coef_final_iter, aes(x = variable, y = coefficient)) +
+                        geom_point(size = 1, alpha = 0.8, color = coef_high_prob$color) +
+                        xlab('variable') +
+                        ylab("probability") +
+                        scale_x_discrete() +
+                        theme(axis.text.x=element_blank(),
+                              axis.ticks.x=element_blank()) +
+                        ggtitle("Posterior Marginal Inclusion Probability",
+                                subtitle = "Final Iteration, MCMC with Gibbs Sampling")
+
+#Model selection diagnostics - arrange plots
+model_selection_plots <- plot_grid(plot_coef_final_iter, plot_prob_var_iter, plot_vars_per_iter,
+                                   plot_postprob_iter, ncol = 2, nrow = 2)
+
+model_selection_plots
+
+```
+
+```{r reg_comparison_appendix}
+chart_data_lasso_full <- season_lasso %>% data.frame() %>%
+                         mutate(variable = rownames(season_lasso)) %>% 
+                         tibble() %>% mutate(color = if_else(pvalue < 0.1, 'red', 'grey')) %>% 
+                         arrange(desc(estimate))
+
+plot_credintervals_lasso <- ggplot(chart_data_lasso_full, aes(x = variable,
+                                                              y = estimate)) +
+                            geom_errorbar(aes(ymin = ci.low, ymax = ci.up), 
+                                          lwd = 0.2,
+                                          color = chart_data_lasso_full$color, width = 0) +
+                            geom_point(size = 0.8, pch = 21, fill= "black", alpha = 0.8) +
+                            scale_x_discrete(breaks = chart_data_lasso_full$variable) +
+                            ggtitle("Season Wins versus Player Metrics",
+                                    subtitle = "L1 penalisation, intervals calculated using post inference method from Lee et al (2016)") +
+                            labs(caption = "Red variables are statistically significant (at 10% level or below)") +
+                            our_theme +
+                            theme(axis.text=element_text(size=6,angle=90))
+
+#bayesian
+chart_data_bayes_long <- season_bayes_full %>%
+                         mutate(color = if_else(margpp > 0.9, 'red', 'grey')) %>%
+                         filter(variable != 'intercept')
+                              
+plot_credintervals_bayes <- ggplot(chart_data_bayes_long, aes(x = variable, y = estimate)) +
+                            geom_errorbar(aes(ymin = X2.5., ymax = X97.5.), 
+                                          lwd = 0.2,
+                                          color = chart_data_bayes_long$color, width = 0) +
+                            geom_point(size = 0.8, pch = 21, fill= "black", alpha = 0.8) +
+                            scale_x_discrete(labels = chart_data_bayes_long$variable) +
+                            ylab("coefficient") +                            
+                            ggtitle("Season Wins versus Player Metrics",
+                                    subtitle = "BMS") +
+                            labs(caption = "Red variables have > 90% marginal posterior inclusion probability") +
+                            our_theme +
+                            theme(axis.text=element_text(size=6,angle=90))
+                  
+plot_credintervals_lasso
+plot_credintervals_bayes
+```

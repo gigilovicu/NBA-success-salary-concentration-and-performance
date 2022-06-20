@@ -1,0 +1,107 @@
+---
+title: "Untitled"
+author: "Gigi Lovicu"
+date: "16/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source(paste0('/home/gigilovicu/Documents/masters/semester_1/statistics/project_submission/code/stats_project_data.R'))
+``` 
+
+## R Markdown
+
+```{r concentration}
+#Salary concentration by team x season
+chart_salary_season_hist <- data_salaries_concentration %>% group_by(season, TEAM_ABBREVIATION) %>% summarise(hhi = first(salary_hhi)) %>% 
+                            ggplot(aes(x = scale(hhi))) +
+                            geom_histogram(aes(y = ..density..), colour = 'black', fill = 'white') +
+                            geom_density(alpha = 0.2, fill = 'red') +
+                            ggtitle('Salary Concentration by Team',
+                                    subtitle = 'Herfindahl-Hirschmann Index, by season') +
+                            scale_y_continuous(labels = scales::comma, )
+
+chart_salary_season_hist
+
+```
+
+```{r season_wins}
+# Histogram of wins per season
+chart_games_won <- data_games_won %>% ungroup() %>% filter(SEASON >= 2005, SEASON <= 2017) %>% 
+                   ggplot(aes(x = win_flag)) +
+                   geom_histogram(aes(), colour = 'black', fill = 'white') +
+                   ggtitle('Games won per Season',
+                           subtitle = 'By Team') +
+                   scale_y_continuous(labels = scales::comma)
+
+chart_games_won
+
+```
+
+```{r season_ws}
+# Histogram of win shares
+chart_winshares <- data_season %>% ungroup() %>% 
+                   ggplot(aes(x = WS)) +
+                   geom_histogram(aes(y = ..density..), colour = 'black', fill = 'white') +
+                            geom_density(alpha = 0.2, fill = 'red') +
+                   ggtitle('Win Share per Season',
+                           subtitle = 'By player') +
+                   scale_y_continuous(labels = scales::comma)
+
+chart_winshares
+
+```
+
+```{r hhi_season_wins}
+#Scatter HHI  vs season wins
+chart_scatter_hhi_wins <- data_season_wide %>% 
+                          ggplot(aes(x = salary_hhi, y = win_flag)) +
+                          geom_point() +
+                          geom_smooth(method="lm", se=TRUE, fullrange=FALSE, level=0.95) +
+                          ggtitle('Salary Concentration and Season Wins')
+                          
+chart_scatter_hhi_wins
+```
+
+```{r salar_share_metrics1}
+# Scatter plots of salary share against metrics
+chart_scatter_salary <- data_season %>% dplyr::select(season, salary_share, OREB:TO) %>%
+                        pivot_longer(-c(season, salary_share), names_to = 'metric') %>% 
+                        ggplot(aes(x = value, y = salary_share)) +
+                        geom_point(alpha = 0.2) +
+                        geom_smooth(method="lm", se=TRUE, fullrange=FALSE, level=0.95) +
+                        facet_wrap(~metric, ncol = 3, nrow = 2) +
+                        ggtitle('Basic Player Metrics vs Salary Share',
+                        subtitle = 'By season, salary share based on top 8 players (by minutes played)')
+
+chart_scatter_salary
+```
+
+```{r salar_share_metrics2}
+# Scatter plots of salary share against metrics
+chart_scatter_salary_ws <- data_season %>% dplyr::select(season, salary_share, OWS:WS) %>%
+                        pivot_longer(-c(season, salary_share), names_to = 'metric') %>% 
+                        ggplot(aes(x = value, y = salary_share)) +
+                        geom_point(alpha = 0.2) +
+                        geom_smooth(method="lm", se=TRUE, fullrange=FALSE, level=0.95) +
+                        facet_wrap(~metric, ncol = 3, nrow = 1) +
+                        ggtitle('Player Win Shares vs Salary Share',
+                        subtitle = 'By season, salary share based on top 8 players (by minutes played)')
+
+chart_scatter_salary_ws
+```
+
+```{r salary_share_metrics3}
+# Scatter plots of salary share against metrics
+chart_scatter_salary_shoot <- data_season %>% dplyr::select(season, salary_share, FG_PCT:FT_PCT) %>%
+                        pivot_longer(-c(season, salary_share), names_to = 'metric') %>% 
+                        ggplot(aes(x = value, y = salary_share)) +
+                        geom_point(alpha = 0.2) +
+                        geom_smooth(method="lm", se=TRUE, fullrange=FALSE, level=0.95) +
+                        facet_wrap(~metric, ncol = 3, nrow = 1) +
+                        ggtitle('Scoring Metrics vs Salary Share',
+                        subtitle = 'By season, salary share based on top 8 players (by minutes played)')
+
+chart_scatter_salary_shoot
+```
