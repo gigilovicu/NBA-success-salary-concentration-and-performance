@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE, echo = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-source(paste0('/home/gigilovicu/Documents/masters/semester_1/statistics/project_submission/code/stats_project_data.R'))
+source(paste0('stats_project_data.R'))
 ``` 
 
 ```{r theme, include = FALSE}
