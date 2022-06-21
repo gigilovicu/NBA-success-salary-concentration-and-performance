@@ -23,7 +23,7 @@ library(cluster) #clustering
 library(factoextra) # clustering algorithms & visualization
 
 ### 01. IMPORT DATA ####################
-PATH_data <-  '/home/gigilovicu/Documents/masters/semester_1/statistics/project_submission/'
+PATH_data <-  ''
 source(file.path(paste0(PATH_data, 'code/'),"routines (glm).R"))
 set.seed(1993)
 # Salaries
